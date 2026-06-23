@@ -1,5 +1,5 @@
 ---
-title: "Analyse des Données - ACP AFC AFCM AFD Clustering"
+title: "PROJET - Profils de développement des pays africains"
 author: "Christian TOSSE"
 date: "2026-06-16"
 output: html_document
@@ -10,51 +10,52 @@ output: html_document
 L'Afrique présente une grande diversité de situations socioéconomiques, allant des pays à faible revenu confrontés à des défis majeurs de développement humain aux économies émergentes affichant des indicateurs plus favorables. Cette étude vise à identifier et caractériser les profils de développement des pays africains à partir d'un ensemble d'indicateurs socioéconomiques et sanitaires issus des données de la Banque Mondiale (2022). En combinant des méthodes d'analyse factorielle, Analyse en Composantes Principales (ACP) sur les indicateurs quantitatifs et Analyse Factorielle des Correspondances Multiples (AFCM) sur les variables qualitatives avec des techniques de classification non supervisée (CAH et k-means) et d'Analyse Factorielle Discriminante (AFD), cette étude cherche à répondre à trois questions : Quelles sont les grandes dimensions qui structurent les inégalités de développement entre pays africains ? Peut-on regrouper ces pays en typologies homogènes ? Et quels facteurs discriminent le mieux ces groupes ? Le Bénin, pays d'Afrique de l'Ouest à faible revenu, servira de point de référence pour situer les résultats dans un contexte concret.
 
 
+## 1. Préparation du jeu de données
 ```{r}
-# ============================================================
-#  PROJET AD — Profils de développement des pays africains
-#  Source : Banque Mondiale (WDI) — données 2022
-#  Étape 1 : Construction et préparation du jeu de données
-# ============================================================
-
-# ---- 0. Packages ----
+# Packages 
 # install.packages(c("dplyr", "tidyr", "skimr", "naniar"))
 library(dplyr)
 library(tidyr)
 library(skimr)
 
-# ---- 1. Construction du jeu de données ----
-# Source : World Development Indicators (Banque Mondiale) 2022
-# 48 pays d'Afrique subsaharienne + Afrique du Nord
-# Variables :
-#   QUANTITATIVES (pour ACP) :
-#     pib_hab          : PIB par habitant (USD courants)
-#     mortalite_inf    : Taux de mortalité infantile (pour 1000 naissances)
-#     esperance_vie    : Espérance de vie à la naissance (années)
-#     taux_alphab      : Taux d'alphabétisation adultes (%)
-#     acces_electricite: Population avec accès à l'électricité (%)
-#     acces_internet   : Utilisateurs d'internet (% population)
-#     taux_urbanisation: Population urbaine (%)
-#     depenses_sante   : Dépenses de santé par habitant (USD)
-#
-#   QUALITATIVES (pour AFCM) :
-#     region           : Région géographique (Afrique de l'Ouest/Est/Nord/Centre/Sud)
-#     niveau_revenu    : Niveau de revenu BM (Faible / Intermédiaire inf. / Intermédiaire sup.)
-#     acces_eau        : Accès eau potable de base (Faible / Moyen / Élevé)
-#     acces_assain     : Accès assainissement de base (Faible / Moyen / Élevé)
-#     couv_sante       : Couverture sanitaire universelle (Faible / Moyenne / Bonne)
-#     scolarisation    : Taux scolarisation primaire (Faible / Moyen / Élevé)
-#     write.csv(africa, "africa_dev.csv", row.names = FALSE)
-```
-
-
-
-```{r}
+# Importation
+# Source : World Development Indicators (WDI) - (Banque Mondiale) 2022
 africa    <- read.csv("africa_dev.csv")
 head(africa)
 cat("Dimensions du jeu de données :", nrow(africa), "pays,", ncol(africa), "variables\n")
+```
 
+### Descrition du jeu de données 
+```{r}
+# Visualisation interactive
+skim(africa)
+# Description des variables
+str(africa)
+```
 
+ ```
+48 pays d'Afrique subsaharienne + Afrique du Nord
+ Variables :
+   QUANTITATIVES :
+     pib_hab          : PIB par habitant (USD courants)
+     mortalite_inf    : Taux de mortalité infantile (pour 1000 naissances)
+     esperance_vie    : Espérance de vie à la naissance (années)
+     taux_alphab      : Taux d'alphabétisation adultes (%)
+     acces_electricite: Population avec accès à l'électricité (%)
+     acces_internet   : Utilisateurs d'internet (% population)
+     taux_urbanisation: Population urbaine (%)
+     depenses_sante   : Dépenses de santé par habitant (USD)
+   QUALITATIVES :
+     region           : Région géographique (Afrique de l'Ouest/Est/Nord/Centre/Sud)
+     niveau_revenu    : Niveau de revenu BM (Faible / Intermédiaire inf. / Intermédiaire sup.)
+     acces_eau        : Accès eau potable de base (Faible / Moyen / Élevé)
+     acces_assain     : Accès assainissement de base (Faible / Moyen / Élevé)
+     couv_sante       : Couverture sanitaire universelle (Faible / Moyenne / Bonne)
+     scolarisation    : Taux scolarisation primaire (Faible / Moyen / Élevé)
+```
+
+### Gestion des facteurs
+```{r}
 # Remettre les facteurs ordonnés
 africa$niveau_revenu  <- factor(africa$niveau_revenu,  levels = c("Faible","Interm_inf","Interm_sup"))
 africa$acces_eau      <- factor(africa$acces_eau,      levels = c("Faible","Moyen","Élevé"))
@@ -65,12 +66,11 @@ africa$region         <- factor(africa$region)
 ```
 
 
-
+### Spécifier les 2 tableaux ACP - ACM
 ```{r}
-# Les 3 tableaux
 # Tableau pour ACP
-tab_acp      <- africa[, c("pib_hab","mortalite_inf","esperance_vie","taux_alphab",
-                            "acces_electricite","acces_internet","taux_urbanisation","depenses_sante")]
+tab_acp <- africa[, c("pib_hab","mortalite_inf","esperance_vie","taux_alphab",
+                      "acces_electricite","acces_internet","taux_urbanisation","depenses_sante")]
 rownames(tab_acp) <- africa$pays
 
 # Tableau pour AFCM
@@ -85,75 +85,70 @@ cat("Tab AFCM  :", nrow(tab_afcm), "pays,", ncol(tab_afcm), "variables quali\n")
 cat("Tab complet:", nrow(tab_complet), "pays,", ncol(tab_complet), "variables\n")
 ```
 
-
+### Résumé rapide des variables quantitatives
 ```{r}
-# ---- 3. Résumé rapide ----
-cat("\n--- Résumé variables quantitatives ---\n")
+cat("\n Résumé variables quantitatives \n")
 summary(tab_acp)
 
-cat("\n--- Distribution région ---\n")
+cat("\n Distribution région \n")
 print(table(africa$region))
 
-cat("\n--- Distribution niveau de revenu ---\n")
+cat("\n Distribution niveau de revenu \n")
 print(table(africa$niveau_revenu))
 
-cat("\n--- Valeurs manquantes ---\n")
+cat("\n Valeurs manquantes \n")
 cat(sum(is.na(africa)), "valeurs manquantes\n")
-
-
-# ---- 4. Sauvegarde ----
-# saveRDS(tab_acp,     "tab_acp.rds")
-# saveRDS(tab_afcm,    "tab_afcm.rds")
-# saveRDS(tab_complet, "tab_complet.rds")
-# write.csv(africa, "africa_dev.csv", row.names = FALSE)
 ```
 
-##  Étape 2 : ACP — Analyse en Composantes Principales
+
+
+##  2. Analyse en Composantes Principales (ACP)
 
 ```{r}
+# Packages
 library(FactoMineR)
 library(factoextra)
 
-# ---- 2. Calcul de l'ACP ----
+# Calcul de l'ACP 
 res_acp <- PCA(tab_acp, scale.unit = TRUE, ncp = 5, graph = FALSE)
 
 
-# ---- 3. Valeurs propres — combien d'axes retenir ? ----
-cat("\n--- Valeurs propres ---\n")
+# Valeurs propres — nombre d'axes a retenir 
+cat("\n Valeurs propres \n")
 print(round(res_acp$eig, 3))
 
-# Éboulis
+# Graphique
 fviz_eig(res_acp,
          addlabels  = TRUE,
          barfill    = "#378ADD",
          barcolor   = "#185FA5",
          linecolor  = "#633806",
-         title      = "Éboulis des valeurs propres — ACP pays africains") +
+         title      = "Graphique des valeurs propres - ACP pays africains") +
   geom_hline(yintercept = 100 / ncol(tab_acp),
              linetype = "dashed", color = "red", linewidth = 0.8) +
   annotate("text", x = 5.5, y = 100/ncol(tab_acp) + 1.5,
            label = "Seuil de Kaiser", color = "red", size = 3.5) +
   theme_minimal(base_size = 13)
 ```
-### Interprétation de l'ACP
 
-#### Axes retenus
+### Axes retenus
 
-Selon la règle de Kaiser (valeur propre > 1), 2 axes sont retenus. Ils expliquent ensemble 78% de la variance totale — c'est excellent pour 8 variables. Le plan Dim1×Dim2 est donc très représentatif de la structure des données. On peut mentionner le Dim3 (85.8% cumulé) en analyse complémentaire mais il n'est pas retenu au sens strict.
+Selon la règle de Kaiser (valeur propre > 1), 2 axes sont retenus. Ils expliquent ensemble 78% de la variance totale, c'est excellent pour 8 variables. Le plan Dim1×Dim2 est donc très représentatif de la structure des données. On peut mentionner le Dim3 (85.8% cumulé) en analyse complémentaire mais il n'est pas retenu au sens strict.
 
-
-
+### Caractéristiques des variables sur les 2 premiers axes 
 ```{r}
-# ---- 4. Qualité des variables ----
-cat("\n--- Coordonnées des variables (2 premiers axes) ---\n")
+cat("\n Coordonnées des variables \n")
 print(round(res_acp$var$coord[, 1:2], 3))
 
-cat("\n--- Cos2 des variables (qualité de représentation) ---\n")
+cat("\n Cos2 des variables (qualité de représentation) \n")
 print(round(res_acp$var$cos2[, 1:2], 3))
 
-cat("\n--- Contributions des variables aux axes (%) ---\n")
+cat("\n Contributions des variables aux axes (%) \n")
 print(round(res_acp$var$contrib[, 1:2], 2))
+```
 
+### Cercle de corrélations des variables
+```{r}
 # Cercle des corrélations Dim1 vs Dim2
 fviz_pca_var(res_acp,
              axes          = c(1, 2),
@@ -172,30 +167,33 @@ fviz_pca_var(res_acp,
              title         = "Cercle des corrélations — Dim 1 & 3") +
   theme_minimal(base_size = 13)
 ```
-## Cercle des corrélations Dim1×Dim2 — Structure des variables
 
-- Axe 1 — "Niveau de développement global" (65.4% de variance)
+### Structure des variables
 
-Toutes les variables contribuent de façon quasi-équilibrée (entre 9.6% et 14.7%). Les variables acces_internet, pib_hab, acces_electricite, depenses_sante tirent fortement vers la droite (coordonnées positives entre 0.86 et 0.88). La mortalite_inf tire vers la gauche (−0.798). Autrement dit :
+- Axe 1 : *Niveau de développement global* (65.4% de variance)
+
+    Toutes les variables contribuent de façon quasi-équilibrée (entre 9.6% et 14.7%). Les variables acces_internet, pib_hab, acces_electricite, depenses_sante tirent fortement vers la droite (coordonnées positives entre 0.86 et 0.88). La mortalite_inf tire vers la gauche (−0.798). Autrement dit :
 
   -- À droite = pays riches, bien connectés, avec un bon système de santé
+  
   -- À gauche = pays pauvres, forte mortalité infantile, accès limité aux services
 
-C'est l'axe des inégalités de développement entre pays africains.
+*C'est l'axe des inégalités de développement entre pays africains*.
 
 
-- Axe 2 — "Transition démographique et urbanisation" (12.6% de variance)
+- Axe 2 : *Transition démographique et urbanisation* (12.6% de variance)
 
-Deux variables dominent : mortalite_inf (+0.542) et esperance_vie (−0.476). Ces deux variables s'opposent sur cet axe, ce qui capte une tension entre mortalité élevée et longévité. taux_urbanisation contribue aussi (15.7%).
+    Deux variables dominent : mortalite_inf (+0.542) et esperance_vie (−0.476). Ces deux variables s'opposent sur cet axe, ce qui capte une tension entre mortalité élevée et longévité. taux_urbanisation contribue aussi (15.7%).
 
   -- En haut = pays avec mortalité infantile encore élevée malgré un PIB moyen
+  
   -- En bas = pays avec meilleure espérance de vie et plus urbanisés
 
-C'est l'axe de la transition démographique.
+*C'est l'axe de la transition démographique*.
 
-
+### Caractéristiques des individus sur les 2 premiers axes 
 ```{r}
-# ---- 5. Nuage des individus (pays) ----
+# Nuage des individus (pays)
 
 # Coloré par région
 africa$region <- factor(africa$region)
@@ -229,19 +227,18 @@ fviz_pca_ind(res_acp,
   theme_minimal(base_size = 11)
 ```
 
-## Nuage des pays — Par région et niveau de revenu
+### Nuage des pays — Par région et niveau de revenu
 
-Les pays d'Afrique du Nord (Maroc, Algérie, Tunisie, Égypte, Libye) se positionnent clairement à droite sur Dim1 — niveau de développement élevé, cohérent avec leur statut de pays à revenu intermédiaire supérieur.
-Les pays d'Afrique de l'Ouest et du Centre à faible revenu (Niger, Tchad, Burkina Faso, Guinée, Mali...) se regroupent à gauche — faible PIB, fort taux de mortalité infantile.
-Les pays d'Afrique australe sont plus dispersés — Botswana et Namibie tirent vers la droite, Mozambique et Zimbabwe restent au centre-gauche.
+Les pays d'Afrique du Nord (Maroc, Algérie, Tunisie, Égypte, Libye) se positionnent clairement à droite sur Dim1, niveau de développement élevé, cohérent avec leur statut de pays à revenu intermédiaire supérieur.
+
+Les pays d'Afrique de l'Ouest et du Centre à faible revenu (Niger, Tchad, Burkina Faso, Guinée, Mali...) se regroupent à gauche, faible PIB, fort taux de mortalité infantile.
+
+Les pays d'Afrique australe sont plus dispersés, Botswana et Namibie tirent vers la droite, Mozambique et Zimbabwe restent au centre-gauche.
+
 La séparation par niveau de revenu est encore plus nette : les trois groupes (Faible / Intermédiaire inf. / Intermédiaire sup.) se séparent très bien sur Dim1, ce qui valide la cohérence de l'ACP.
 
-
-
-
+### Représentation biplot des pays et variables sur les axes
 ```{r}
-
-# ---- 6. Biplot final ----
 fviz_pca_biplot(res_acp,
                 axes         = c(1, 2),
                 geom.ind     = c("point", "text"),
@@ -255,69 +252,60 @@ fviz_pca_biplot(res_acp,
   theme_minimal(base_size = 11)
 
 
-# ---- 7. Aide à l'interprétation ----
-cat("\n========== INTERPRÉTATION ==========\n")
+# Aide à l'interprétation 
+cat("\n INTERPRÉTATION \n")
 
-cat("\n-- AXE 1 : variables les plus contributives --\n")
+cat("\n AXE 1 : variables les plus contributives \n")
 print(sort(round(res_acp$var$contrib[, 1], 2), decreasing = TRUE))
 
-cat("\n-- AXE 2 : variables les plus contributives --\n")
+cat("\n AXE 2 : variables les plus contributives \n")
 print(sort(round(res_acp$var$contrib[, 2], 2), decreasing = TRUE))
 
-cat("\n-- AXE 3 : variables les plus contributives --\n")
+cat("\n AXE 3 : variables les plus contributives \n")
 print(sort(round(res_acp$var$contrib[, 3], 2), decreasing = TRUE))
 
-cat("\n-- Pays les mieux représentés sur le plan 1-2 (cos2 > 0.6) --\n")
+cat("\n Pays les mieux représentés sur le plan 1-2 (cos2 > 0.6) \n")
 cos2_plan12 <- res_acp$ind$cos2[,1] + res_acp$ind$cos2[,2]
 print(sort(round(cos2_plan12[cos2_plan12 > 0.6], 3), decreasing = TRUE))
 
-cat("\n-- Position du Bénin sur les axes --\n")
+cat("\n Position du Bénin sur les axes \n")
 print(round(res_acp$ind$coord["Bénin", 1:3], 3))
-
-
-# ---- 8. Sauvegarde ----
-#saveRDS(res_acp, "res_acp.rds")
-#coord_ind_acp <- as.data.frame(res_acp$ind$coord)
-#saveRDS(coord_ind_acp, "coord_ind_acp.rds")
 ```
 
-## Position du Bénin
+### Position du Bénin
 
 Dim.1 = -1.493 | Dim.2 = +0.655 | Dim.3 = +0.704
-Le Bénin est négatif sur Dim1 → positionné du côté des pays à faible niveau de développement. Positif sur Dim2 → mortalité infantile encore présente, urbanisation modérée. C'est cohérent avec son statut de pays à faible revenu d'Afrique de l'Ouest. Il se situe dans le groupe des pays comme le Togo, le Niger, le Mali — pas les plus défavorisés mais clairement en deçà de la moyenne africaine.
+
+Le Bénin est négatif sur Dim1, positionné du côté des pays à faible niveau de développement.
+
+Positif sur Dim2, mortalité infantile encore présente, urbanisation modérée. C'est cohérent avec son statut de pays à faible revenu d'Afrique de l'Ouest. Il se situe dans le groupe des pays comme le Togo, le Niger, le Mali, pas les plus défavorisés mais clairement en deçà de la moyenne africaine.
 
 
 ### Conclusion sur l'ACP
 
-L'ACP révèle que les inégalités de développement entre pays africains s'organisent principalement autour d'un axe général de niveau de développement (65.4%) qui oppose les pays d'Afrique du Nord et australe aux pays d'Afrique subsaharienne à faible revenu, et d'un axe secondaire de transition démographique (12.6%) capturant les tensions entre mortalité infantile et espérance de vie."
+    L'ACP révèle que les inégalités de développement entre pays africains s'organisent principalement autour d'un axe général de niveau de développement (65.4%) qui oppose les pays d'Afrique du Nord et australe aux pays d'Afrique subsaharienne à faible revenu, et d'un axe secondaire de transition démographique (12.6%) capturant les tensions entre mortalité infantile et espérance de vie."
 
 
 
 
-
-
-## Étape 3 : AFCM — Analyse Factorielle des Correspondances Multiples
+## 3. Analyse Factorielle des Correspondances Multiples (AFCM)
 
 ```{r}
-cat("Tableau AFCM :", nrow(tab_afcm), "pays,", ncol(tab_afcm), "variables\n")
-cat("Nombre total de modalités :", sum(sapply(tab_afcm, nlevels)), "\n")
-
-
-# ---- 2. Calcul de l'AFCM ----
+# Calcul de l'AFCM 
 res_afcm <- MCA(tab_afcm, ncp = 5, graph = FALSE)
 
 
-# ---- 3. Valeurs propres — axes à retenir ----
-cat("\n--- Valeurs propres AFCM ---\n")
+# Valeurs propres — axes à retenir 
+cat("\n Valeurs propres AFCM \n")
 print(round(res_afcm$eig, 3))
 
-# Éboulis
+# graphique
 fviz_screeplot(res_afcm,
                addlabels = TRUE,
                barfill   = "#5DCAA5",
                barcolor  = "#085041",
                linecolor = "#633806",
-               title     = "Éboulis des valeurs propres — AFCM pays africains") +
+               title     = "Graphique des valeurs propres — AFCM pays africains") +
   theme_minimal(base_size = 13)
 
 # Règle de Benzécri : on retient les axes dont la valeur propre > 1/K
@@ -331,11 +319,12 @@ print(res_afcm$eig[res_afcm$eig[,1] > seuil_benzecri, ])
 
 ```
 
+    Avec le seuil de Benzécri (1/K = 1/6 = 0.167), 5 axes sont retenus. Mais en pratique, le plan Dim1×Dim2 suffit pour l'interprétation principale (53.7%). C'est normal en AFCM d'avoir des pourcentages plus faibles qu'en ACP, la variance est répartie sur plus de dimensions car les variables sont qualitatives.
 
+
+# Graphique des modalités
 
 ```{r}
-# ---- 4. Graphique des modalités ----
-
 # Plan Dim1 × Dim2
 fviz_mca_var(res_afcm,
              axes        = c(1, 2),
@@ -353,30 +342,55 @@ fviz_mca_var(res_afcm,
              repel       = TRUE,
              title       = "Modalités — Plan Dim 1 & 3 (AFCM)") +
   theme_minimal(base_size = 12)
-
-
-# ---- 5. Contributions des variables aux axes ----
-cat("\n--- Contributions des VARIABLES aux axes (eta2) ---\n")
-print(round(res_afcm$var$eta2[, 1:3], 3))
-
-cat("\n--- Contributions des MODALITÉS à l'axe 1 (top 10) ---\n")
-contrib_dim1 <- sort(res_afcm$var$contrib[, 1], decreasing = TRUE)
-print(round(head(contrib_dim1, 10), 2))
-
-cat("\n--- Contributions des MODALITÉS à l'axe 2 (top 10) ---\n")
-contrib_dim2 <- sort(res_afcm$var$contrib[, 2], decreasing = TRUE)
-print(round(head(contrib_dim2, 10), 2))
-
-cat("\n--- Cos2 des modalités sur le plan 1-2 (top 10) ---\n")
-cos2_mod <- res_afcm$var$cos2[,1] + res_afcm$var$cos2[,2]
-print(round(sort(cos2_mod, decreasing = TRUE)[1:10], 3))
-
 ```
 
 
-```{r}
-# ---- 6. Nuage des individus (pays) ----
+- Axe 1 : *Accès aux services de base* (33%)
 
+    Les variables acces_assain, couv_sante et acces_eau dominent très fortement cet axe. Les modalités qui contribuent le plus sont acces_assain_Élevé (13.1%), couv_sante_Bonne (13.0%) et acces_eau_Élevé (12.6%) d'un côté, et leurs opposés Faible de l'autre. C'est un axe qui oppose clairement les pays avec de bons services de base aux pays avec des services très limités.
+
+- Axe 2 : *Intermédiaires en transition* (20.7%)
+
+    Ici les modalités couv_sante_Moyenne (16.8%), acces_assain_Moyen (15.0%) et acces_eau_Moyen (12.1%) dominent. Cet axe capture les pays qui sont ni dans la précarité totale ni dans le développement avancé, les pays en transition, avec des accès intermédiaires. scolarisation_Faible et niveau_revenu_Interm_inf y contribuent aussi.
+
+- Axe 3 :
+                
+      c'est la region qui domine. Cet axe capte donc les spécificités géographiques non expliquées par les niveaux de service.
+
+
+```{r}
+#  Contributions des variables aux axes 
+cat("\n Contributions des VARIABLES aux axes (eta2) \n")
+print(round(res_afcm$var$eta2[, 1:3], 3))
+
+cat("\n Contributions des MODALITÉS à l'axe 1 (top 10) \n")
+contrib_dim1 <- sort(res_afcm$var$contrib[, 1], decreasing = TRUE)
+print(round(head(contrib_dim1, 10), 2))
+
+cat("\n Contributions des MODALITÉS à l'axe 2 (top 10) \n")
+contrib_dim2 <- sort(res_afcm$var$contrib[, 2], decreasing = TRUE)
+print(round(head(contrib_dim2, 10), 2))
+
+cat("\n Cos2 des modalités sur le plan 1-2 (top 10) \n")
+cos2_mod <- res_afcm$var$cos2[,1] + res_afcm$var$cos2[,2]
+print(round(sort(cos2_mod, decreasing = TRUE)[1:10], 3))
+```
+
+### Modalités les mieux représentées (cos2 > 0.6)
+
+Les modalités les mieux projetées sur le plan 1-2 sont :
+
+- couv_sante_Bonne (0.900) : pays avec bonne couverture sanitaire
+- acces_assain_Élevé (0.896) : pays avec bon assainissement
+- acces_eau_Élevé (0.858) : bonne eau potable
+- acces_assain_Faible (0.786) et couv_sante_Faible (0.779) : précarité extrême
+
+Ce sont les extrêmes qui sont les mieux représentés, les modalités "Moyen" et "Moyenne" sont plus au centre du nuage, ce qui est cohérent : elles sont moins discriminantes.
+
+
+### Graphique des individus (pays)
+
+```{r}
 # Coloré par région
 fviz_mca_ind(res_afcm,
              axes        = c(1, 2),
@@ -402,9 +416,15 @@ fviz_mca_ind(res_afcm,
              legend.title = "Niveau de revenu",
              title       = "Nuage des pays AFCM — coloré par niveau de revenu") +
   theme_minimal(base_size = 11)
+```
+
+Les pays d'Afrique du Nord se positionnent clairement à droite sur Dim1 : bonne eau, bon assainissement, bonne couverture sanitaire. 
+
+Les pays d'Afrique de l'Ouest et du Centre à faible revenu se regroupent à gauche. Sur Dim2, les pays Interm_inf (Côte d'Ivoire, Ghana, Kenya...) occupent une position intermédiaire, c'est exactement ce que capture l'axe 2.
 
 
-# ---- 7. Biplot modalités + pays ----
+```{r}
+# Biplot modalités + pays 
 fviz_mca_biplot(res_afcm,
                 axes         = c(1, 2),
                 geom.ind     = c("point","text"),
@@ -432,10 +452,27 @@ cat("\n--- Modalités les plus proches du Bénin (variables actives) ---\n")
 print(tab_afcm["Bénin", ])
 ```
 
+### *Position du Bénin*
+
+*Dim 1 = -0.513 | Dim 2 = +0.530 | cos² plan 1-2 = 0.302*
+
+Profil du Bénin : Ouest / Faible revenu / Eau Moyen / Assain Faible / Santé Moyenne / Scolarisation Moyen
+
+Le Bénin est négatif sur Dim1 : côté services limités, cohérent avec son assainissement faible et son faible revenu. 
+
+Positif sur Dim2 : son accès à l'eau "Moyen" et sa couverture sanitaire "Moyenne" le placent dans le groupe des pays intermédiaires sur cet axe, pas dans la précarité absolue. 
+
+Le cos2 de 0.302 est modéré, le Bénin n'est pas un cas extrême, il est dans la masse centrale des pays ouest-africains à faible revenu.
+
+
+### Conclusion sur l'AFCM
+
+    L'AFCM révèle que les conditions de vie qualitatives des pays africains s'organisent principalement selon un gradient d'accès aux services de base (assainissement, eau potable, couverture sanitaire) sur le premier axe, et un axe de transition distinguant les pays intermédiaires des cas extrêmes sur le second axe. Le Bénin se positionne dans le groupe des pays à services limités, avec quelques nuances positives sur l'accès à l'eau et la couverture sanitaire.
 
 
 
-#  Étape 4 : CAH + k-means — Classification non supervisée
+##  4: CAH + k-means : Classification non supervisée
+
 ```{r}
 library(cluster)
 
@@ -460,38 +497,12 @@ rownames(tab_classif) <- africa$pays
 
 cat("Tableau pour classification :", nrow(tab_classif), "pays,",
     ncol(tab_classif), "dimensions\n")
-
 ```
 
+### CAH — Classification Ascendante Hiérarchique 
 
+#### Choix du nombre de classes 
 ```{r}
-# ---- 2. CAH — Classification Ascendante Hiérarchique ----
-
-# Matrice de distances euclidiennes
-dist_mat <- dist(tab_classif, method = "euclidean")
-
-# CAH avec critère de Ward (minimise l'inertie intra-classe)
-res_cah <- hclust(dist_mat, method = "ward.D2")
-
-# Dendrogramme
-fviz_dend(res_cah,
-          k             = 4,           # on colore en 4 groupes (à confirmer)
-          k_colors      = c("#F0997B","#378ADD","#5DCAA5","#EF9F27"),
-          color_labels_by_k = TRUE,
-          rect          = TRUE,
-          rect_fill     = TRUE,
-          rect_border   = c("#F0997B","#378ADD","#5DCAA5","#EF9F27"),
-          labels_track_height = 0.8,
-          main          = "Dendrogramme CAH (Ward) — pays africains",
-          cex           = 0.7) +
-  theme_minimal()
-
-```
-
-
-```{r}
-# ---- 3. Choix du nombre de classes ----
-
 # Méthode du coude (inertie intra)
 fviz_nbclust(tab_classif,
              FUNcluster = kmeans,
@@ -509,6 +520,15 @@ fviz_nbclust(tab_classif,
              linecolor  = "#5DCAA5") +
   labs(title = "Méthode silhouette — choix du nombre de classes") +
   theme_minimal(base_size = 13)
+```
+
+
+```{r}
+# Matrice de distances euclidiennes
+dist_mat <- dist(tab_classif, method = "euclidean")
+
+# CAH avec critère de Ward (minimise l'inertie intra-classe)
+res_cah <- hclust(dist_mat, method = "ward.D2")
 
 # Inertie expliquée par la CAH
 inertie <- sort(res_cah$height, decreasing = TRUE)
@@ -517,40 +537,87 @@ plot(inertie[1:10], type = "b", pch = 19, col = "#378ADD",
      main = "Saut d'inertie — CAH Ward")
 # Le saut le plus grand indique le bon nombre de classes
 
+# Dendrogramme
+fviz_dend(res_cah,
+          k             = 4,           # on colore en 4 groupes 
+          k_colors      = c("#F0997B","#378ADD","#5DCAA5","#EF9F27"),
+          color_labels_by_k = TRUE,
+          rect          = TRUE,
+          rect_fill     = TRUE,
+          rect_border   = c("#F0997B","#378ADD","#5DCAA5","#EF9F27"),
+          labels_track_height = 0.8,
+          main          = "Dendrogramme CAH (Ward) — pays africains",
+          cex           = 0.7) +
+  theme_minimal()
+```
 
-# ---- 4. Découpe en k classes ----
-k <- 4   # à ajuster selon les graphiques ci-dessus
-
+### Représentation des pays par classe
+```{r}
+k = 4
 groupes_cah <- cutree(res_cah, k = k)
-cat("\n--- Répartition des pays par classe (CAH) ---\n")
+cat("\n Répartition des pays par classe (CAH) \n")
 print(table(groupes_cah))
+```
 
-cat("\n--- Pays par classe ---\n")
-for(i in 1:k) {
-  cat("\nClasse", i, ":\n")
-  cat(names(groupes_cah[groupes_cah == i]), "\n")
-}
-
-
-# ---- 5. K-means (consolidation) ----
+###  K-means pour confirmation
+```{r}
 set.seed(123)  # pour la reproductibilité
 res_kmeans <- kmeans(tab_classif, centers = k, nstart = 25, iter.max = 100)
 
-cat("\n--- Répartition des pays par classe (k-means) ---\n")
+cat("\n Répartition des pays par classe (k-means) \n")
 print(table(res_kmeans$cluster))
 
 # Comparaison CAH vs k-means
-cat("\n--- Comparaison CAH vs k-means ---\n")
+cat("\n Comparaison CAH vs k-means \n")
 print(table(CAH = groupes_cah, Kmeans = res_kmeans$cluster))
-
 ```
 
 
 ```{r}
-# ---- 6. Visualisation des classes ----
+# Identifier les profils par le PIB moyen de chaque cluster
+profils <- aggregate(pib_hab ~ cluster, 
+                     data = data.frame(tab_acp, cluster = res_kmeans$cluster), 
+                     FUN = mean)
+print(profils[order(profils$pib_hab), ])
+```
 
-# Classes k-means sur le plan ACP
-africa$classe <- factor(res_kmeans$cluster)
+
+### *Les 4 profils de pays*
+
+- Classe 1 : **"Pays avancés" (10 pays)**
+
+    Gabon, Botswana, Namibie, Maroc, Algérie, Tunisie, Égypte, Libye, Afrique du Sud, Cabo Verde
+
+    100% ont un assainissement élevé et une bonne couverture sanitaire. Dominés par l'Afrique du Nord et australe, niveau intermédiaire supérieur. C'est le groupe le plus développé du continent.
+
+- Classe 2 : **"Pays en grande précarité" (10 pays)**
+
+    Burkina Faso, Guinée, Mali, Niger, RD Congo, Tchad, Mozambique, Sierra Leone, Liberia, Guinée-Bissau
+
+    100% ont un assainissement faible et une couverture sanitaire faible. 100% à faible revenu. C'est le groupe le plus défavorisé — forte mortalité, faible scolarisation, accès aux services quasi inexistant.
+    
+- Classe 3 : **"Pays à faible revenu mais en légère progression" (14 pays)**
+
+    Togo, Zimbabwe, Éthiopie, Tanzanie, Ouganda, Rwanda, Burundi, Madagascar, Malawi, Mauritanie, Gambie, Soudan, Érythrée, Comores
+    
+    Majorité à faible revenu (12/14), dominés par l'Afrique de l'Est. Meilleure espérance de vie et alphabétisation que la classe 2, mais assainissement encore très faible (12/14 faible). Groupe intermédiaire bas.
+
+- Classe 4 : **"Pays intermédiaires en transition" (14 pays)**
+
+    Bénin, Côte d'Ivoire, Ghana, Nigeria, Sénégal, Cameroun, Congo, Angola, Zambie, Kenya, Lesotho, Eswatini, Djibouti, São Tomé  
+    Dominés par les pays à revenu intermédiaire inf. (13/14). Accès à l'eau et assainissement moyens. Couverture sanitaire moyenne pour 10/14. C'est le groupe des pays en transition — ni précaires ni avancés.
+    
+### Position du Bénin
+
+      Le Bénin appartient à la Classe 4 — pays intermédiaires en transition. C'est cohérent avec son profil réel : revenu intermédiaire inférieur, accès à l'eau moyen, couverture sanitaire moyenne, scolarisation moyenne. Il se situe aux côtés du Sénégal, du Ghana, du Kenya — des pays ouest et est-africains en développement actif.
+
+###  Visualisation des classes 
+
+```{r}
+# Classes k-means sur le plan combiné
+africa$classe <- factor(res_kmeans$cluster,
+                        levels = c(2, 3, 4, 1),
+                        labels = c("Précaires", "Progression", "Transition", "Avancés"))
 
 fviz_cluster(res_kmeans,
              data         = tab_classif,
@@ -561,7 +628,7 @@ fviz_cluster(res_kmeans,
              main         = "Classes k-means — plan factoriel combiné") +
   theme_minimal(base_size = 11)
 
-# Classes sur le plan ACP uniquement
+# Classes sur le plan ACP 
 fviz_pca_ind(res_acp,
              axes         = c(1, 2),
              geom.ind     = c("point","text"),
@@ -574,7 +641,7 @@ fviz_pca_ind(res_acp,
              title         = "Classes k-means projetées sur le plan ACP") +
   theme_minimal(base_size = 11)
 
-# Classes sur le plan AFCM uniquement
+# Classes sur le plan AFCM 
 fviz_mca_ind(res_afcm,
              axes         = c(1, 2),
              geom.ind     = c("point","text"),
@@ -586,131 +653,81 @@ fviz_mca_ind(res_afcm,
              legend.title = "Classe",
              title         = "Classes k-means projetées sur le plan AFCM") +
   theme_minimal(base_size = 11)
-
-
-# ---- 7. Profils des classes ----
-cat("\n========== PROFILS DES CLASSES ==========\n")
-
-# Moyennes des variables quantitatives par classe
-cat("\n--- Moyennes variables quantitatives par classe ---\n")
-profil_quanti <- africa %>%
-  group_by(classe) %>%
-  summarise(
-    n               = n(),
-    pib_hab         = round(mean(pib_hab), 0),
-    mortalite_inf   = round(mean(mortalite_inf), 1),
-    esperance_vie   = round(mean(esperance_vie), 1),
-    taux_alphab     = round(mean(taux_alphab), 1),
-    acces_elec      = round(mean(acces_electricite), 1),
-    acces_internet  = round(mean(acces_internet), 1),
-    urbanisation    = round(mean(taux_urbanisation), 1),
-    dep_sante       = round(mean(depenses_sante), 0)
-  )
-print(profil_quanti)
-
-# Distribution des variables qualitatives par classe
-cat("\n--- Distribution région par classe ---\n")
-print(table(africa$classe, africa$region))
-
-cat("\n--- Distribution niveau de revenu par classe ---\n")
-print(table(africa$classe, africa$niveau_revenu))
-
-cat("\n--- Distribution accès assainissement par classe ---\n")
-print(table(africa$classe, africa$acces_assain))
-
-cat("\n--- Distribution couverture santé par classe ---\n")
-print(table(africa$classe, africa$couv_sante))
-
-# Classe du Bénin
-cat("\n--- Classe du Bénin ---\n")
-cat("Le Bénin appartient à la classe", africa$classe[africa$pays == "Bénin"], "\n")
 ```
+
+
+### **Conclusion sur la Classification**
+
+*La classification met en évidence 4 profils distincts de pays africains : les pays avancés à revenu élevé (10 pays, dominés par l'Afrique du Nord), les pays en grande précarité (10 pays, Afrique subsaharienne à faible revenu), les pays à faible revenu en légère progression (14 pays, dominés par l'Afrique de l'Est), et les pays intermédiaires en transition (14 pays, dont le Bénin). La convergence parfaite entre CAH et k-means valide la robustesse de ces typologies.*
+    
+
+
+
+
+#  5. Analyse Factorielle Discriminante (AFD)
+
+```{r}
+library(MASS)       # lda()
+library(klaR)       # partimat() - représentation graphique AFD
+
+# Tableau pour l'AFD — variables quantitatives uniquement 
+# L'AFD de MASS::lda() travaille sur des variables numériques
+tab_afd <- tab_acp
+tab_afd$classe <- africa$classe
+rownames(tab_afd) <- africa$pays
+```
+
+
+### Test MANOVA pour significativité globale
+```{r}
+cat("\n MANOVA — les classes diffèrent-elles globalement ? \n")
+Y <- as.matrix(tab_acp)
+manova_res <- manova(Y ~ tab_afd$classe)
+print(summary(manova_res, test = "Wilks"))
+```
+
+### Validité globale — MANOVA
+
+    Le test de Wilks donne λ = 0.021, p-value < 2.2e-16. Les 4 classes sont hautement significativement différentes sur l'ensemble des 8 variables quantitatives. L'AFD est pleinement justifiée.
 
 
 
 ```{r}
-# ============================================================
-#  PROJET AD — Profils de développement des pays africains
-#  Étape 5 : AFD — Analyse Factorielle Discriminante
-# ============================================================
-library(MASS)       # lda()
-library(klaR)       # partimat() - représentation graphique AFD
-
-res_kmeans   <- kmeans(tab_classif, centers = 4, nstart = 25, iter.max = 100)
-africa$classe <- factor(res_kmeans$cluster,
-                         labels = c("Avancés","Précaires","Progression","Transition"))
-
-cat("Classes reconstruites :\n")
-print(table(africa$classe))
-cat("\nClasse du Bénin :", as.character(africa$classe[africa$pays == "Bénin"]), "\n")
-
-
-# ---- 2. Tableau pour l'AFD — variables quantitatives uniquement ----
-# L'AFD de MASS::lda() travaille sur des variables numériques
-tab_afd <- africa[, c("pib_hab","mortalite_inf","esperance_vie","taux_alphab",
-                       "acces_electricite","acces_internet","taux_urbanisation","depenses_sante")]
-tab_afd$classe <- africa$classe
-rownames(tab_afd) <- africa$pays
-
-cat("\nTableau AFD :", nrow(tab_afd), "pays,", ncol(tab_afd)-1, "variables + 1 variable cible\n")
-
-
-# ---- 3. Test de l'homogénéité des variances (Bartlett) ----
-cat("\n--- Test de Bartlett (homogénéité des variances) ---\n")
-vars_quanti <- c("pib_hab","mortalite_inf","esperance_vie","taux_alphab",
-                 "acces_electricite","acces_internet","taux_urbanisation","depenses_sante")
-for(v in vars_quanti) {
-  bt <- bartlett.test(tab_afd[[v]] ~ tab_afd$classe)
-  cat(sprintf("%-22s : p-value = %.4f %s\n", v, bt$p.value,
-              ifelse(bt$p.value < 0.05, "(*)", "")))
-}
-
-
-# ---- 4. Test MANOVA (significativité globale) ----
-cat("\n--- MANOVA — les classes diffèrent-elles globalement ? ---\n")
-Y <- as.matrix(tab_afd[, vars_quanti])
-manova_res <- manova(Y ~ tab_afd$classe)
-print(summary(manova_res, test = "Wilks"))
-
-
-# ---- 5. Calcul de l'AFD ----
+# Calcul de l'AFD 
 res_lda <- lda(classe ~ pib_hab + mortalite_inf + esperance_vie + taux_alphab +
                  acces_electricite + acces_internet + taux_urbanisation + depenses_sante,
                data = tab_afd,
                prior = rep(1/4, 4))   # prior uniforme : même poids aux 4 classes
+round(res_lda$scaling, 3)
 
-cat("\n--- Résultats AFD ---\n")
-print(res_lda)
-
-
-# ---- 6. Variance expliquée par chaque axe discriminant ----
-cat("\n--- Proportion de variance expliquée par chaque axe AFD ---\n")
+#  Variance expliquée par chaque axe discriminant 
+cat("\n Proportion de variance expliquée par chaque axe AFD \n")
 prop_var <- res_lda$svd^2 / sum(res_lda$svd^2) * 100
 for(i in seq_along(prop_var)) {
   cat(sprintf("Axe discriminant %d : %.1f%%\n", i, prop_var[i]))
 }
 cat(sprintf("Variance cumulée axes 1+2 : %.1f%%\n", sum(prop_var[1:2])))
+```
+
+    Le premier axe seul concentre 88.3% de la séparation entre classes — les 4 profils se distinguent presque entièrement sur une seule dimension.
 
 
-# ---- 7. Coefficients discriminants (importance des variables) ----
-cat("\n--- Coefficients discriminants standardisés ---\n")
-# On standardise pour comparer les variables entre elles
-coef_std <- coef(res_lda)
-print(round(coef_std, 3))
 
-cat("\n--- Variables les plus discriminantes (valeur absolue) ---\n")
-cat("Sur l'axe 1 :\n")
-ax1 <- sort(abs(coef_std[,1]), decreasing = TRUE)
-print(round(ax1, 3))
-cat("\nSur l'axe 2 :\n")
-ax2 <- sort(abs(coef_std[,2]), decreasing = TRUE)
-print(round(ax2, 3))
+### Variables discriminantes — LD1 et LD2
 
+- LD1 : "Axe de développement humain" (88.3%)
 
-# ---- 8. Prédiction et taux de bien classés ----
+    Les pays avec espérance de vie élevée et internet développé se positionnent à droite de LD1 → profil Avancés. Les pays avec forte mortalité infantile et internet faible se positionnent à gauche → profil Précaires.
+
+- LD2 : "Axe de transition démographique" (7.5%)
+
+    esperance_vie (+0.073) et mortalite_inf (+0.047) dominent aussi LD2, mais dans une configuration différente qui permet de séparer les classes Précaires et Progression — deux groupes proches sur LD1 mais distingués sur LD2 par leur dynamique démographique.
+
+```{r}
+# Prédiction et taux de bien classés 
 pred_lda <- predict(res_lda, tab_afd)
 
-cat("\n--- Matrice de confusion (classes réelles vs prédites) ---\n")
+cat("\n Matrice de confusion (classes réelles vs prédites) \n")
 confusion <- table(Réelle = tab_afd$classe, Prédite = pred_lda$class)
 print(confusion)
 
@@ -722,9 +739,17 @@ for(i in rownames(confusion)) {
   tx <- confusion[i,i] / sum(confusion[i,]) * 100
   cat(sprintf("  Classe %-12s : %.1f%%\n", i, tx))
 }
+```
 
+    La classe Transition (dont fait partie le Bénin) est la moins bien discriminée, 3 pays mal classés. Cette classe est la plus hétérogène, à la frontière entre Précaires et Progression. La classe Avancés est parfaitement séparée (100%).
 
-# ---- 9. Projection des pays sur les axes discriminants ----
+### Position du Bénin
+
+    LD1 = −1.774 | LD2 = +0.680 | Classe prédite : Transition 
+
+```{r}
+
+#  Projection des pays sur les axes discriminants 
 scores_lda <- as.data.frame(pred_lda$x)
 scores_lda$classe <- africa$classe
 scores_lda$pays   <- africa$pays
@@ -761,5 +786,11 @@ cat("\n--- Probabilités d'appartenance du Bénin aux classes ---\n")
 benin_proba <- pred_lda$posterior[rownames(pred_lda$posterior) == "Bénin", ]
 print(round(benin_proba, 4))
 ```
+
+
+Le Bénin est classé en Transition par la CAH et le k-means, mais l'AFD le prédit en Progression avec une probabilité légèrement supérieure (32.6% vs 39.2% pour Transition). Cette discordance s'explique par le fait que l'AFD n'utilise que les variables quantitatives, sur lesquelles le profil économique du Bénin (PIB = 1 425$/hab) le rapproche du groupe Progression. Les variables qualitatives (accès à l'eau moyen, couverture sanitaire moyenne) incluses dans la classification expliquent son rattachement au groupe Transition. Le Bénin n'est pas ancré dans un profil unique, il est en équilibre instable entre trois groupes, ce qui reflète fidèlement sa trajectoire de développement.
+
+
+L'AFD confirme la robustesse de la classification avec un taux de bien classés de 89.6% et une séparation quasi-totale des groupes sur le premier axe discriminant (88.3%). L'espérance de vie et l'accès à internet sont les variables les plus discriminantes. Le Bénin, correctement classé dans le groupe Transition, présente néanmoins une appartenance partagée entre trois profils, révélant sa position fragile et intermédiaire dans le paysage du développement africain."
 
 
