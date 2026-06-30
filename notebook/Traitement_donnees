@@ -1,0 +1,106 @@
+---
+title: "Projet Analyse des données"
+author: "Christian TOSSE"
+date: "2026-06-10"
+output: html_document
+---
+
+
+```{r}
+# 1. Installer et charger
+# install.packages("WDI")
+library(WDI)
+library(dplyr)
+
+# 2. Chercher les codes exacts des indicateurs
+WDIsearch("internet users")        # cherche le code de l'accès internet
+WDIsearch("mortality infant")      # mortalité infantile
+WDIsearch("GDP per capita")        # PIB par habitant
+WDIsearch("life expectancy")       # espérance de vie
+WDIsearch("literacy")              # alphabétisation
+WDIsearch("access to electricity") # électricité
+WDIsearch("urban population")      # urbanisation
+WDIsearch("health expenditure")    # dépenses de santé
+```
+
+
+```{r}
+# 3. Téléchargement — pays africains, année 2022
+africa_wdi <- WDI(
+  country   = "all",          # tous les pays
+  indicator = c(
+    pib_hab            = "NY.GDP.PCAP.CD",
+    mortalite_inf      = "SP.DYN.IMRT.IN",
+    esperance_vie      = "SP.DYN.LE00.IN",
+    taux_alphab        = "SE.ADT.LITR.ZS",
+    acces_electricite  = "EG.ELC.ACCS.ZS",
+    acces_internet     = "IT.NET.USER.ZS",
+    taux_urbanisation  = "SP.URB.TOTL.IN.ZS",
+    depenses_sante     = "SH.XPD.CHEX.PC.CD"
+  ),
+  start = 2022,
+  end   = 2022,
+  extra = TRUE    # ajoute région, niveau de revenu, etc.
+)
+
+# 4. Filtrer uniquement les pays africains
+africa_clean <- africa_wdi %>%
+  filter(region %in% c(
+    "Sub-Saharan Africa",
+    "Middle East & North Africa"
+  )) %>%
+  filter(!is.na(pib_hab)) %>%         # enlever les lignes vides
+  select(pays=country, iso2c,
+         pib_hab, mortalite_inf, esperance_vie,
+         taux_alphab, acces_electricite, acces_internet,
+         taux_urbanisation, depenses_sante,
+         region, income=income)        # région et revenu déjà inclus via extra=TRUE
+
+# 5. Vérifier
+cat("Pays récupérés :", nrow(africa_clean), "\n")
+cat("Valeurs manquantes :\n")
+print(colSums(is.na(africa_clean)))
+
+# 6. Sauvegarder
+# write.csv(africa_clean, "africa_wdi_reel.csv", row.names = FALSE)
+head(africa_clean)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+africa_wdi1 <- WDI(
+  country   = c(
+    "Sub-Saharan Africa",
+    "Middle East & North Africa"
+  ),          # tous les pays
+  indicator = c(
+                "NY.GDP.PCAP.CD",
+    "SP.DYN.IMRT.IN",
+   "SP.DYN.LE00.IN",
+   "SE.ADT.LITR.ZS",
+     "EG.ELC.ACCS.ZS",
+     "IT.NET.USER.ZS",
+    "SP.URB.TOTL.IN.ZS",
+    "SH.XPD.CHEX.PC.CD"
+  ),
+  start = 2022,
+  end   = 2022,
+  extra = TRUE    # ajoute région, niveau de revenu, etc.
+)
+
+africa_wdi1
+```
+
+
+
